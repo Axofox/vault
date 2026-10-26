@@ -220,9 +220,12 @@ async function processNewScreenshot(filepath) {
   if (!fs.existsSync(filepath)) return;
   const img = nativeImage.createFromPath(filepath);
   if (img.isEmpty()) return;
-  const ts   = Date.now();
+  const id   = Date.now();
+  // Show when the screenshot was taken (file creation), not when the app noticed it
+  let ts = id;
+  try { const st = fs.statSync(filepath); ts = Math.round(st.birthtimeMs || st.mtimeMs) || id; } catch {}
   const thumb = img.resize({ width: 240 });
-  const item  = { id: ts.toString(), ts, file: filepath, thumb: thumb.toDataURL() };
+  const item  = { id: id.toString(), ts, file: filepath, thumb: thumb.toDataURL() };
   screenshots = readJSON(SHOTS_FILE, []);
   screenshots.unshift(item);
   screenshots = pruneOld(screenshots.slice(0, 200));
@@ -326,13 +329,14 @@ async function startRecording(bounds) {
   ipcMain.removeHandler('get-source-id');
   ipcMain.removeHandler('save-recording');
   ipcMain.handleOnce('get-source-id', () => sourceId);
+  const startedAt = Date.now();
   ipcMain.handleOnce('save-recording', (_, bytes, ext) => {
     const ts   = Date.now();
     const file = path.join(RECS_DIR, `rec-${ts}.${ext}`);
     fs.writeFileSync(file, Buffer.from(bytes));
 
     recordings = readJSON(RECS_FILE, []);
-    recordings.unshift({ id: ts.toString(), ts, file, ext, bounds });
+    recordings.unshift({ id: ts.toString(), ts: startedAt, file, ext, bounds });
     recordings = pruneOld(recordings.slice(0, 100));
     writeJSON(RECS_FILE, recordings);
     win?.webContents.send('recordings-updated', recordings.map(safeRec));

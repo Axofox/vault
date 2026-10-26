@@ -1,6 +1,6 @@
 {
   "name": "vault",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "QA productivity tool — clipboard, screenshots, recordings",
   "main": "src/main.js",
   "scripts": {

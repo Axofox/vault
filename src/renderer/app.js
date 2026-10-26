@@ -24,6 +24,19 @@ function fmt(ms) {
   return d.toLocaleDateString();
 }
 
+// Exact creation time: "Today 20:05:12", "Yesterday 09:41:03", "Oct 26 20:05:12"
+function fmtExact(ms) {
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const day = new Date(); day.setHours(0, 0, 0, 0);
+  const dayMs = 86400e3;
+  if (d >= day) return `Today ${time}`;
+  if (d >= day - dayMs) return `Yesterday ${time}`;
+  const opts = { month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return `${d.toLocaleDateString([], opts)} ${time}`;
+}
+
 function fmtDuration(ms) {
   const s = Math.round(ms / 1000);
   const m = Math.floor(s / 60);
@@ -100,7 +113,7 @@ function renderClips() {
           ${esc(kindLabel)}
         </div>
         <div class="${textClass}">${esc(c.display.slice(0, 80))}${c.display.length > 80 ? '…' : ''}</div>
-        <div class="clip-time">${fmt(c.ts)}</div>
+        <div class="clip-time" title="${fmt(c.ts)}">${fmtExact(c.ts)}</div>
       </div>
     </div>`;
   }).join('');
@@ -123,7 +136,7 @@ function renderScreenshots() {
       ${thumb
         ? `<img class="shot-thumb" src="${esc(thumb)}" alt="Screenshot">`
         : `<div class="shot-thumb-placeholder"></div>`}
-      <div class="shot-meta">${fmt(s.ts)}</div>
+      <div class="shot-meta">${fmtExact(s.ts)}</div>
     </div>`;
   }).join('');
 }
@@ -150,7 +163,7 @@ function renderRecordings() {
       <video class="rec-thumb" src="${esc(fileUrl(r.path || ''))}#t=0.1" muted loop playsinline preload="metadata"></video>
       <div class="rec-item-body">
         <div class="rec-item-name">${esc(name)}</div>
-        <div class="rec-item-meta">${fmt(r.ts)}${dur ? ' · ' + dur : ''}</div>
+        <div class="rec-item-meta" title="${fmt(r.ts)}">${fmtExact(r.ts)}${dur ? ' · ' + dur : ''}</div>
       </div>
     </div>`;
   }).join('');
