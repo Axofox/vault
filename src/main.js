@@ -416,6 +416,19 @@ function registerIPC() {
       return true;
     } catch { return false; }
   });
+  // Put the video file itself on the clipboard so it can be pasted into Finder, Slack, mail...
+  ipcMain.handle('copy-recording', (_, filePath) => {
+    if (!filePath || !fs.existsSync(filePath) || !filePath.startsWith(RECS_DIR)) return false;
+    try {
+      const esc = filePath.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      clipboard.writeBuffer('public.file-url', Buffer.from(require('url').pathToFileURL(filePath).href));
+      clipboard.writeBuffer('NSFilenamesPboardType', Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><array><string>' +
+        esc + '</string></array></plist>'));
+      return true;
+    } catch { return false; }
+  });
   ipcMain.handle('choose-screenshot-dir', async () => {
     const result = await dialog.showOpenDialog(win, {
       title: 'Choose screenshot folder to watch',

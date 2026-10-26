@@ -174,9 +174,14 @@ html, body {
 .clip-action-btn:hover { background: rgba(255,255,255,0.12); color: var(--fg); }
 
 /* ── Screenshot grid ── */
-.shot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; align-content: start; }
-.shot-item { cursor: pointer; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: var(--bg3); }
-.shot-item:hover { border-color: rgba(255,255,255,0.18); }
+.shot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px; align-content: start; }
+.shot-item {
+  cursor: pointer; border-radius: 8px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.14); background: var(--bg3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  transition: border-color 0.12s, transform 0.12s;
+}
+.shot-item:hover { border-color: var(--ac-border); transform: translateY(-1px); }
 .shot-thumb {
   display: block; width: 100%; aspect-ratio: 16/10;
   object-fit: cover;
@@ -185,8 +190,8 @@ html, body {
   width: 100%; aspect-ratio: 16/10; background: var(--bg3);
 }
 .shot-meta {
-  font-size: 10px; color: var(--fg3);
-  padding: 4px 6px 5px;
+  font-size: 10.5px; color: var(--fg2);
+  padding: 6px 8px 7px; border-top: 1px solid var(--border);
 }
 
 /* ── Recording list items ── */

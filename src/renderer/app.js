@@ -119,7 +119,7 @@ function renderScreenshots() {
 
   grid.innerHTML = items.map(s => {
     const thumb = s.thumb || s.thumbnail || '';
-    return `<div class="shot-item" data-path="${esc(s.path || '')}" title="${fmt(s.ts)}">
+    return `<div class="shot-item" data-path="${esc(s.path || s.file || '')}" title="${fmt(s.ts)}">
       ${thumb
         ? `<img class="shot-thumb" src="${esc(thumb)}" alt="Screenshot">`
         : `<div class="shot-thumb-placeholder"></div>`}
@@ -273,6 +273,14 @@ function bindEvents() {
     if (!item || !item.dataset.path) return;
     const ok = await api.copyScreenshot(item.dataset.path);
     showToast(ok ? 'Screenshot copied to clipboard' : 'Could not copy screenshot', !ok);
+  });
+
+  // ── Recording list: click to copy the file to the clipboard ─────────────────
+  document.getElementById('rec-list').addEventListener('click', async e => {
+    const item = e.target.closest('.rec-item');
+    if (!item || !item.dataset.path) return;
+    const ok = await api.copyRecording(item.dataset.path);
+    showToast(ok ? 'Recording copied, paste it into Finder, Slack, etc.' : 'Could not copy recording', !ok);
   });
 
   // ── Record button ────────────────────────────────────────────────────────────
