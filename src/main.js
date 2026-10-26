@@ -149,7 +149,7 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.on('blur', () => { if (!win.webContents.isDevToolsFocused()) win.hide(); });
+  win.on('blur', () => { if (!win.webContents.isDevToolsFocused() && !recordingActive) win.hide(); });
 }
 
 function positionWindow() {
@@ -312,7 +312,10 @@ function registerIPC() {
     return new Promise(resolve => openOverlay(resolve));
   });
   ipcMain.handle('start-recording', async (_, bounds) => {
-    return startRecording(bounds);
+    const result = await startRecording(bounds);
+    // Show the panel again so the Stop button is accessible during recording
+    win?.show(); win?.focus();
+    return result;
   });
   ipcMain.handle('stop-recording', () => stopRecording());
   ipcMain.handle('close-window', () => win?.hide());
