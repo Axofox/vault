@@ -11,9 +11,30 @@ contextBridge.exposeInMainWorld('vault', {
     return () => ipcRenderer.removeListener('clips-updated', handler);
   },
 
-  // Screenshots / Recordings
-  getScreenshots: () => ipcRenderer.invoke('get-screenshots'),
-  getRecordings:  () => ipcRenderer.invoke('get-recordings'),
+  // Screenshots
+  getScreenshots:      ()      => ipcRenderer.invoke('get-screenshots'),
+  takeScreenshot:      ()      => ipcRenderer.invoke('take-screenshot'),
+  onScreenshotsUpdated: (fn)  => {
+    const handler = (_, data) => fn(data);
+    ipcRenderer.on('screenshots-updated', handler);
+    return () => ipcRenderer.removeListener('screenshots-updated', handler);
+  },
+
+  // Recordings
+  getRecordings:      ()      => ipcRenderer.invoke('get-recordings'),
+  startAreaSelect:    ()      => ipcRenderer.invoke('start-area-select'),
+  startRecording:     (bounds) => ipcRenderer.invoke('start-recording', bounds),
+  stopRecording:      ()      => ipcRenderer.invoke('stop-recording'),
+  onRecordingsUpdated: (fn)  => {
+    const handler = (_, data) => fn(data);
+    ipcRenderer.on('recordings-updated', handler);
+    return () => ipcRenderer.removeListener('recordings-updated', handler);
+  },
+  onRecordingState: (fn) => {
+    const handler = (_, state) => fn(state);
+    ipcRenderer.on('recording-state', handler);
+    return () => ipcRenderer.removeListener('recording-state', handler);
+  },
 
   // Prefs
   getPrefs:  ()      => ipcRenderer.invoke('get-prefs'),

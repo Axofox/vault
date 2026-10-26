@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Vault Capture</title></head>
+<body>
+<video id="v" autoplay muted style="display:none"></video>
+<script>
+let recorder, chunks = [];
+
+async function start() {
+  const sourceId = await window.capture.getSourceId();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'desktop',
+        chromeMediaSourceId: sourceId,
+      }
+    }
+  });
+  document.getElementById('v').srcObject = stream;
+  recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const buf = await blob.arrayBuffer();
+    await window.capture.saveRecording(Array.from(new Uint8Array(buf)), 'webm');
+    chunks = [];
+  };
+  recorder.start(200);
+}
+
+window.capture.onStop(() => {
+  if (recorder && recorder.state !== 'inactive') recorder.stop();
+});
+
+start();
+</script>
+</body>
+</html>

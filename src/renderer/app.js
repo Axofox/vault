@@ -10,6 +10,7 @@ let state = {
   recordings: [],
   prefs: {},
   search: '',
+  isRecording: false,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,13 +24,35 @@ function fmt(ms) {
   return d.toLocaleDateString();
 }
 
+function fmtDuration(ms) {
+  const s = Math.round(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+}
+
 function esc(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 // ── Apply accent across CSS vars ──────────────────────────────────────────────
 function applyAccent(color) {
   document.documentElement.style.setProperty('--ac', color);
+}
+
+// ── Flash feedback on a row ──────────────────────────────────────────────────
+function flashRow(el, msg) {
+  const original = el.dataset.flashOrig ?? el.querySelector('.clip-time')?.textContent ?? '';
+  const timeEl = el.querySelector('.clip-time');
+  if (!timeEl) return;
+  el.dataset.flashOrig = original;
+  timeEl.textContent = msg;
+  timeEl.style.color = 'var(--ac)';
+  clearTimeout(el._flashTimer);
+  el._flashTimer = setTimeout(() => {
+    timeEl.textContent = original;
+    timeEl.style.color = '';
+    delete el.dataset.flashOrig;
+  }, 1200);
 }
 
 // ── Render clipboard ──────────────────────────────────────────────────────────
@@ -38,7 +61,10 @@ function renderClips() {
   const q = state.search.toLowerCase();
 
   let items = state.clips;
-  if (q) items = items.filter(c => c.display.toLowerCase().includes(q) || (c.sensitive||'').toLowerCase().includes(q));
+  if (q) items = items.filter(c =>
+    c.display.toLowerCase().includes(q) ||
+    (c.sensitive || '').toLowerCase().includes(q)
+  );
 
   document.getElementById('badge-clip').textContent = state.clips.length;
 
@@ -52,7 +78,7 @@ function renderClips() {
     const kindLabel = isSens ? c.sensitive : c.kind.toUpperCase();
     const kindClass = isSens ? 'sens' : c.kind;
     const textClass = isSens ? 'clip-text masked' : 'clip-text';
-    return `<div class="clip-item${isSens ? ' sens' : ''}" data-id="${esc(c.id)}">
+    return `<div class="clip-item${isSens ? ' sens' : ''}" data-id="${esc(c.id)}" role="button" tabindex="0" title="Click to copy">
       <div class="clip-meta">
         <div class="clip-kind ${kindClass}">
           ${isSens ? `<svg width="10" height="10" viewBox="0 0 10 10"><path d="M5 1a2 2 0 0 0-2 2v1H2v5h6V4H7V3a2 2 0 0 0-2-2zm0 1a1 1 0 0 1 1 1v1H4V3a1 1 0 0 1 1-1zm0 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" fill="currentColor"/></svg>` : ''}
@@ -61,9 +87,57 @@ function renderClips() {
         <div class="${textClass}">${esc(c.display.slice(0, 80))}${c.display.length > 80 ? '…' : ''}</div>
         <div class="clip-time">${fmt(c.ts)}</div>
       </div>
-      <div class="clip-actions">
-        ${isSens ? `<button class="clip-action-btn reveal-btn" data-id="${esc(c.id)}">Reveal</button>` : ''}
-        <button class="clip-action-btn copy-btn" data-id="${esc(c.id)}">Copy</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Render screenshots ────────────────────────────────────────────────────────
+function renderScreenshots() {
+  const grid = document.getElementById('shot-grid');
+  const items = state.screenshots;
+  document.getElementById('badge-shots').textContent = items.length;
+
+  if (!items.length) {
+    grid.innerHTML = `<div class="empty-state"><p>No screenshots yet.</p><p class="sub">Use the camera button below to capture a screenshot.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(s => {
+    const thumb = s.thumb || s.thumbnail || '';
+    return `<div class="shot-item" data-path="${esc(s.path || '')}" title="${fmt(s.ts)}">
+      ${thumb
+        ? `<img class="shot-thumb" src="${esc(thumb)}" alt="Screenshot">`
+        : `<div class="shot-thumb-placeholder"></div>`}
+      <div class="shot-meta">${fmt(s.ts)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render recordings ─────────────────────────────────────────────────────────
+function renderRecordings() {
+  const list = document.getElementById('rec-list');
+  const items = state.recordings;
+  document.getElementById('badge-recs').textContent = items.length;
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><p>No recordings yet.</p><p class="sub">Use the record button below to capture an area.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(r => {
+    const dur = r.duration ? fmtDuration(r.duration) : '';
+    const name = (r.path || '').split('/').pop() || 'recording';
+    return `<div class="rec-item" data-path="${esc(r.path || '')}">
+      <div class="rec-item-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect x="1" y="3" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
+          <circle cx="14.5" cy="7" r="2.5" fill="#FF4444" opacity="0.85"/>
+          <path d="M5 9l3-2v4L5 9z" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="rec-item-body">
+        <div class="rec-item-name">${esc(name)}</div>
+        <div class="rec-item-meta">${fmt(r.ts)}${dur ? ' · ' + dur : ''}</div>
       </div>
     </div>`;
   }).join('');
@@ -74,21 +148,14 @@ function renderSettings() {
   const p = state.prefs;
   applyAccent(p.accent || '#00FF87');
 
-  // Swatches
   document.querySelectorAll('.swatch').forEach(el => {
     el.classList.toggle('sel', el.dataset.color === p.accent);
   });
-
-  // Retention
   document.querySelectorAll('#retention-seg .seg-opt').forEach(el => {
     el.classList.toggle('on', el.dataset.val === p.retention);
   });
-
-  // Toggles
   document.getElementById('toggle-sens1').classList.toggle('on', !!p.autoDetectSensitive);
   document.getElementById('toggle-sens2').classList.toggle('on', !!p.blurScreenshots);
-
-  // Chips
   document.querySelectorAll('#quality-chips .chip').forEach(el => {
     el.classList.toggle('on', el.dataset.val === p.quality);
   });
@@ -115,6 +182,25 @@ function showPage(page) {
   document.getElementById('app-main').hidden     = page === 'settings';
   document.getElementById('app-settings').hidden = page !== 'settings';
   if (page === 'settings') renderSettings();
+}
+
+// ── Recording UI state ────────────────────────────────────────────────────────
+function setRecordingUI(active) {
+  const btn = document.getElementById('btn-record');
+  const dot = document.getElementById('rec-dot');
+  const lbl = document.getElementById('rec-label');
+  state.isRecording = active;
+  if (active) {
+    btn.classList.add('recording');
+    btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg> Stop`;
+    dot.classList.add('live');
+    lbl.textContent = 'Recording…';
+  } else {
+    btn.classList.remove('recording');
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="currentColor"/></svg> Record area`;
+    dot.classList.remove('live');
+    lbl.textContent = 'Ready';
+  }
 }
 
 // ── Events ────────────────────────────────────────────────────────────────────
@@ -145,42 +231,60 @@ function bindEvents() {
   document.getElementById('btn-settings').addEventListener('click', () => showPage('settings'));
   document.getElementById('btn-back').addEventListener('click', () => showPage('main'));
 
-  // Clip list delegation
+  // ── Clip list: whole-row click to copy ──────────────────────────────────────
   document.getElementById('clip-list').addEventListener('click', async e => {
-    const copyBtn = e.target.closest('.copy-btn');
-    const revealBtn = e.target.closest('.reveal-btn');
-    if (copyBtn) {
-      await api.copyClip(copyBtn.dataset.id);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
-    }
-    if (revealBtn) {
-      // TODO: reveal flow (confirm re-copy)
-      const item = state.clips.find(c => c.id === revealBtn.dataset.id);
-      if (item) alert('Sensitive item — copy from the Copy button to use it.');
+    const row = e.target.closest('.clip-item');
+    if (!row) return;
+    await api.copyClip(row.dataset.id);
+    flashRow(row, '✓ Copied');
+  });
+  document.getElementById('clip-list').addEventListener('keydown', async e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.clip-item');
+    if (!row) return;
+    e.preventDefault();
+    await api.copyClip(row.dataset.id);
+    flashRow(row, '✓ Copied');
+  });
+
+  // ── Screenshot button ───────────────────────────────────────────────────────
+  document.getElementById('btn-screenshot').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-screenshot');
+    btn.disabled = true;
+    try {
+      await api.takeScreenshot();
+      // screenshots-updated will fire; also switch to shots tab
+      switchTab('shots');
+    } finally {
+      btn.disabled = false;
     }
   });
 
-  // Record button
-  document.getElementById('btn-record').addEventListener('click', () => {
-    const btn = document.getElementById('btn-record');
-    const dot = document.getElementById('rec-dot');
-    const lbl = document.getElementById('rec-label');
-    if (btn.classList.contains('recording')) {
-      btn.classList.remove('recording');
-      btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="currentColor"/></svg> Record area`;
-      dot.classList.remove('live');
-      lbl.textContent = 'Ready';
+  // ── Record button ────────────────────────────────────────────────────────────
+  document.getElementById('btn-record').addEventListener('click', async () => {
+    if (state.isRecording) {
+      // Stop recording
+      await api.stopRecording();
+      setRecordingUI(false);
     } else {
-      btn.classList.add('recording');
-      btn.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" rx="1.5" fill="currentColor"/></svg> Stop`;
-      dot.classList.add('live');
-      lbl.textContent = 'Recording…';
+      // Start area selection → recording
+      const btn = document.getElementById('btn-record');
+      btn.disabled = true;
+      try {
+        const bounds = await api.startAreaSelect();
+        if (bounds) {
+          await api.startRecording(bounds);
+          setRecordingUI(true);
+        }
+      } catch (err) {
+        console.error('Area select/record error:', err);
+      } finally {
+        btn.disabled = false;
+      }
     }
   });
 
   // ── Settings events ──
-  // Swatches
   document.getElementById('swatches').addEventListener('click', async e => {
     const sw = e.target.closest('.swatch');
     if (!sw) return;
@@ -188,7 +292,6 @@ function bindEvents() {
     renderSettings();
   });
 
-  // Retention
   document.getElementById('retention-seg').addEventListener('click', async e => {
     const opt = e.target.closest('.seg-opt');
     if (!opt) return;
@@ -196,7 +299,6 @@ function bindEvents() {
     renderSettings();
   });
 
-  // Toggles
   document.getElementById('toggle-sens1').addEventListener('click', async () => {
     state.prefs = await api.setPrefs({ autoDetectSensitive: !state.prefs.autoDetectSensitive });
     renderSettings();
@@ -206,7 +308,6 @@ function bindEvents() {
     renderSettings();
   });
 
-  // Chips
   document.getElementById('quality-chips').addEventListener('click', async e => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
@@ -220,7 +321,6 @@ function bindEvents() {
     renderSettings();
   });
 
-  // Reset
   document.getElementById('btn-reset').addEventListener('click', async () => {
     state.prefs = await api.setPrefs({
       accent: '#00FF87', retention: '30d',
@@ -230,10 +330,30 @@ function bindEvents() {
     renderSettings();
   });
 
-  // IPC: live clip updates
+  // ── IPC live updates ────────────────────────────────────────────────────────
   api.onClipsUpdated(clips => {
     state.clips = clips;
     renderClips();
+  });
+
+  api.onScreenshotsUpdated(shots => {
+    state.screenshots = shots;
+    renderScreenshots();
+    document.getElementById('badge-shots').textContent = shots.length;
+  });
+
+  api.onRecordingsUpdated(recs => {
+    state.recordings = recs;
+    renderRecordings();
+    document.getElementById('badge-recs').textContent = recs.length;
+    // Auto-stop recording UI when a new recording lands
+    setRecordingUI(false);
+    // Switch to recordings tab
+    if (state.tab !== 'recs') switchTab('recs');
+  });
+
+  api.onRecordingState(active => {
+    setRecordingUI(!!active);
   });
 
   // IPC: navigate (from main process)
@@ -248,7 +368,9 @@ async function init() {
 
   applyAccent(state.prefs.accent || '#00FF87');
   renderClips();
-  renderSettings(); // preload settings state
+  renderScreenshots();
+  renderRecordings();
+  renderSettings();
   bindEvents();
 }
 

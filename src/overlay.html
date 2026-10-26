@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100vw; height: 100vh; overflow: hidden; background: transparent; cursor: crosshair; }
+#canvas { position: fixed; inset: 0; }
+#hint {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); color: #fff; padding: 6px 14px;
+  border-radius: 8px; font-family: system-ui; font-size: 13px;
+  pointer-events: none; white-space: nowrap;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="hint">Drag to select recording area — Esc to cancel</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let start = null, current = null, dragging = false;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  draw();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!start || !current) return;
+  const x = Math.min(start.x, current.x);
+  const y = Math.min(start.y, current.y);
+  const w = Math.abs(current.x - start.x);
+  const h = Math.abs(current.y - start.y);
+  if (w < 4 || h < 4) return;
+  ctx.clearRect(x, y, w, h);
+  ctx.strokeStyle = '#00FF87';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  // size label
+  ctx.fillStyle = 'rgba(0,255,135,0.85)';
+  ctx.font = '12px system-ui';
+  ctx.fillText(`${w} × ${h}`, x + 6, y + h - 6);
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+canvas.addEventListener('mousedown', e => {
+  dragging = true;
+  start = { x: e.clientX, y: e.clientY };
+  current = { ...start };
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  current = { x: e.clientX, y: e.clientY };
+  draw();
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!dragging) return;
+  dragging = false;
+  const x = Math.min(start.x, current.x);
+  const y = Math.min(start.y, current.y);
+  const w = Math.abs(current.x - start.x);
+  const h = Math.abs(current.y - start.y);
+  if (w > 10 && h > 10) {
+    window.overlay.sendSelection({ x, y, w, h });
+  } else {
+    window.overlay.cancel();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') window.overlay.cancel();
+});
+</script>
+</body>
+</html>
