@@ -1,6 +1,6 @@
 const {
   app, BrowserWindow, Tray, nativeImage,
-  ipcMain, clipboard, screen, desktopCapturer
+  ipcMain, clipboard, screen, desktopCapturer, systemPreferences, shell
 } = require('electron');
 const path = require('path');
 const fs   = require('fs');
@@ -170,12 +170,24 @@ function toggleWindow() {
 let screenshots = [];
 
 async function takeScreenshot() {
+  // macOS Screen Recording permission check
+  if (process.platform === 'darwin') {
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    if (status !== 'granted') {
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      win?.webContents.send('screenshot-error', 'Screen Recording permission required.\nPlease grant Vault access in\nSystem Preferences → Privacy → Screen Recording,\nthen restart Vault.');
+      return;
+    }
+  }
   screenshots = readJSON(SHOTS_FILE, []);
   const sources = await desktopCapturer.getSources({
     types: ['screen'],
     thumbnailSize: { width: 1440, height: 900 },
   });
-  if (!sources.length) return;
+  if (!sources.length) {
+    win?.webContents.send('screenshot-error', 'No screen sources found. Try restarting Vault.');
+    return;
+  }
   const thumb = sources[0].thumbnail;
   const ts    = Date.now();
   const file  = path.join(SHOTS_DIR, `shot-${ts}.png`);

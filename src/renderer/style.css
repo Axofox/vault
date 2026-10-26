@@ -327,3 +327,21 @@ html, body {
   transition: color 0.1s; padding: 0;
 }
 .reset-link:hover { color: var(--fg2); }
+
+/* Toast notification */
+.vault-toast {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: #2A2A2A; color: #E0E0E0;
+  padding: 8px 16px; border-radius: 8px;
+  font-size: 12px; line-height: 1.5; text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  max-width: 300px; white-space: pre-line;
+  z-index: 9999; pointer-events: none;
+  animation: toastIn 0.2s ease;
+}
+.vault-toast-error { border-color: rgba(255, 80, 80, 0.4); color: #FF9999; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

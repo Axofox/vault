@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('vault', {
     ipcRenderer.on('screenshots-updated', handler);
     return () => ipcRenderer.removeListener('screenshots-updated', handler);
   },
+  onScreenshotError: (fn) => {
+    const handler = (_, msg) => fn(msg);
+    ipcRenderer.on('screenshot-error', handler);
+    return () => ipcRenderer.removeListener('screenshot-error', handler);
+  },
 
   // Recordings
   getRecordings:      ()      => ipcRenderer.invoke('get-recordings'),

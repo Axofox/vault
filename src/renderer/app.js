@@ -56,6 +56,21 @@ function flashRow(el, msg) {
 }
 
 // ── Render clipboard ──────────────────────────────────────────────────────────
+// ── Toast helper ──────────────────────────────────────────────────────────────
+function showToast(msg, isError = false) {
+  let toast = document.getElementById('vault-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'vault-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.className = 'vault-toast' + (isError ? ' vault-toast-error' : '');
+  toast.removeAttribute('hidden');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.setAttribute('hidden', ''), 4000);
+}
+
 function renderClips() {
   const list = document.getElementById('clip-list');
   const q = state.search.toLowerCase();
@@ -354,6 +369,10 @@ function bindEvents() {
 
   api.onRecordingState(active => {
     setRecordingUI(!!active);
+  });
+
+  api.onScreenshotError(msg => {
+    showToast(msg, true);
   });
 
   // IPC: navigate (from main process)
