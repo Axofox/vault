@@ -7,7 +7,8 @@
     "start": "electron .",
     "dev": "ELECTRON_IS_DEV=1 electron .",
     "build:mac": "electron-builder --mac dmg",
-    "build:mac:dir": "electron-builder --mac dir"
+    "build:mac:dir": "electron-builder --mac dir",
+    "prebuild:mac": "npm version patch --no-git-tag-version"
   },
   "author": "Tina Heigl",
   "license": "MIT",
