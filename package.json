@@ -1,15 +1,48 @@
 {
   "name": "vault",
   "version": "0.1.0",
-  "description": "QA productivity tool — clipboard, screenshots, recordings",
+  "description": "QA productivity tool \u2014 clipboard, screenshots, recordings",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "ELECTRON_IS_DEV=1 electron ."
+    "dev": "ELECTRON_IS_DEV=1 electron .",
+    "build:mac": "electron-builder --mac dmg",
+    "build:mac:dir": "electron-builder --mac dir"
   },
   "author": "Tina Heigl",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^32.2.0"
+    "electron": "^32.2.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.vault.app",
+    "productName": "Vault",
+    "files": [
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "Vault",
+      "background": null,
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
   }
 }

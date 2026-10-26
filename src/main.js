@@ -346,7 +346,16 @@ app.whenReady().then(() => {
   watchScreenshotDir();
   ensureDataDir();
   loadPrefs();
-  app.dock?.hide();
+
+  // Show in both dock and menu bar
+  // Dock click opens/focuses the panel
+  if (app.dock) {
+    app.dock.show();
+    app.on('activate', () => {
+      if (!win?.isVisible()) { positionWindow(); win.show(); win.focus(); }
+      else win.focus();
+    });
+  }
 
   tray = new Tray(createTrayIcon());
   tray.setToolTip('Vault');
