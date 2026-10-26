@@ -180,14 +180,9 @@ function getMacScreenshotDir() {
   return path.join(os.homedir(), 'Desktop');
 }
 
-function isMacScreenshot(filename) {
-  // Matches: "Screenshot 2026-10-26 at 12.34.56.png" or "Screen Shot 2026-10-26 at 12.34.56 PM.png"
-  return /^(Screenshot|Screen Shot)\s+\d{4}-\d{2}-\d{2}/.test(filename) && filename.endsWith('.png');
-}
-
 async function processNewScreenshot(filepath) {
-  // Wait briefly to ensure file is fully written
-  await new Promise(r => setTimeout(r, 600));
+  // Wait briefly to ensure file is fully written by the OS
+  await new Promise(r => setTimeout(r, 800));
   if (!fs.existsSync(filepath)) return;
 
   const img = nativeImage.createFromPath(filepath);
@@ -210,15 +205,28 @@ async function processNewScreenshot(filepath) {
 function watchScreenshotDir() {
   const dir = getMacScreenshotDir();
   if (!fs.existsSync(dir)) return;
-  const seen = new Set();
-  fs.watch(dir, (eventType, filename) => {
-    if (!filename || !isMacScreenshot(filename)) return;
-    const filepath = path.join(dir, filename);
-    if (seen.has(filepath)) return;
-    seen.add(filepath);
-    setTimeout(() => seen.delete(filepath), 5000); // debounce
-    processNewScreenshot(filepath);
-  });
+
+  // Poll every 1.5s — more reliable than fs.watch on macOS
+  const seen = new Set(fs.readdirSync(dir));
+  setInterval(() => {
+    try {
+      const files = fs.readdirSync(dir);
+      for (const filename of files) {
+        if (seen.has(filename)) continue;
+        seen.add(filename);
+        // Accept any new PNG (covers custom shortcut apps too)
+        if (!filename.endsWith('.png') && !filename.endsWith('.jpg')) continue;
+        // Only process files created in the last 30s (ignore pre-existing files on first scan)
+        const filepath = path.join(dir, filename);
+        try {
+          const stat = fs.statSync(filepath);
+          if (Date.now() - stat.mtimeMs < 30000) {
+            processNewScreenshot(filepath);
+          }
+        } catch {}
+      }
+    } catch {}
+  }, 1500);
 }
 
 // ── Area selection overlay ─────────────────────────────────────────────────
