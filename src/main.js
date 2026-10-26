@@ -1,8 +1,10 @@
 const {
   app, BrowserWindow, Tray, nativeImage,
-  ipcMain, clipboard, screen, desktopCapturer, systemPreferences, shell
+  ipcMain, clipboard, screen, desktopCapturer
 } = require('electron');
 const path = require('path');
+const os   = require('os');
+const { execSync } = require('child_process');
 const fs   = require('fs');
 const zlib = require('zlib');
 
@@ -169,39 +171,54 @@ function toggleWindow() {
 // ── Screenshots ────────────────────────────────────────────────────────────
 let screenshots = [];
 
-async function takeScreenshot() {
-  // macOS Screen Recording permission check
-  if (process.platform === 'darwin') {
-    const status = systemPreferences.getMediaAccessStatus('screen');
-    if (status !== 'granted') {
-      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
-      win?.webContents.send('screenshot-error', 'Screen Recording permission required.\nPlease grant Vault access in\nSystem Preferences → Privacy → Screen Recording,\nthen restart Vault.');
-      return;
-    }
-  }
-  screenshots = readJSON(SHOTS_FILE, []);
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: { width: 1440, height: 900 },
-  });
-  if (!sources.length) {
-    win?.webContents.send('screenshot-error', 'No screen sources found. Try restarting Vault.');
-    return;
-  }
-  const thumb = sources[0].thumbnail;
-  const ts    = Date.now();
-  const file  = path.join(SHOTS_DIR, `shot-${ts}.png`);
-  fs.writeFileSync(file, thumb.toPNG());
+function getMacScreenshotDir() {
+  if (process.platform !== 'darwin') return path.join(os.homedir(), 'Desktop');
+  try {
+    const loc = execSync('defaults read com.apple.screencapture location 2>/dev/null', { encoding: 'utf8' }).trim();
+    if (loc) return loc.startsWith('~') ? path.join(os.homedir(), loc.slice(2)) : loc;
+  } catch {}
+  return path.join(os.homedir(), 'Desktop');
+}
 
-  const item = {
-    id: ts.toString(), ts,
-    file,
-    thumb: thumb.resize({ width: 240 }).toDataURL(),
-  };
+function isMacScreenshot(filename) {
+  // Matches: "Screenshot 2026-10-26 at 12.34.56.png" or "Screen Shot 2026-10-26 at 12.34.56 PM.png"
+  return /^(Screenshot|Screen Shot)\s+\d{4}-\d{2}-\d{2}/.test(filename) && filename.endsWith('.png');
+}
+
+async function processNewScreenshot(filepath) {
+  // Wait briefly to ensure file is fully written
+  await new Promise(r => setTimeout(r, 600));
+  if (!fs.existsSync(filepath)) return;
+
+  const img = nativeImage.createFromPath(filepath);
+  if (img.isEmpty()) return;
+
+  const ts   = Date.now();
+  const dest = path.join(SHOTS_DIR, `shot-${ts}.png`);
+  fs.copyFileSync(filepath, dest);
+
+  const thumb = img.resize({ width: 240 });
+  const item  = { id: ts.toString(), ts, file: dest, thumb: thumb.toDataURL() };
+
+  screenshots = readJSON(SHOTS_FILE, []);
   screenshots.unshift(item);
   screenshots = pruneOld(screenshots.slice(0, 200));
   writeJSON(SHOTS_FILE, screenshots);
   win?.webContents.send('screenshots-updated', screenshots);
+}
+
+function watchScreenshotDir() {
+  const dir = getMacScreenshotDir();
+  if (!fs.existsSync(dir)) return;
+  const seen = new Set();
+  fs.watch(dir, (eventType, filename) => {
+    if (!filename || !isMacScreenshot(filename)) return;
+    const filepath = path.join(dir, filename);
+    if (seen.has(filepath)) return;
+    seen.add(filepath);
+    setTimeout(() => seen.delete(filepath), 5000); // debounce
+    processNewScreenshot(filepath);
+  });
 }
 
 // ── Area selection overlay ─────────────────────────────────────────────────
@@ -301,12 +318,7 @@ function registerIPC() {
     recordings = pruneOld(readJSON(RECS_FILE, []));
     return recordings.map(safeRec);
   });
-  ipcMain.handle('take-screenshot', async () => {
-    win?.hide();
-    await new Promise(r => setTimeout(r, 150)); // brief pause so panel disappears
-    await takeScreenshot();
-    win?.show(); win?.focus();
-  });
+
   ipcMain.handle('start-area-select', () => {
     win?.hide();
     return new Promise(resolve => openOverlay(resolve));
@@ -323,6 +335,7 @@ function registerIPC() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  watchScreenshotDir();
   ensureDataDir();
   loadPrefs();
   app.dock?.hide();

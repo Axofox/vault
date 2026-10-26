@@ -262,19 +262,6 @@ function bindEvents() {
     flashRow(row, '✓ Copied');
   });
 
-  // ── Screenshot button ───────────────────────────────────────────────────────
-  document.getElementById('btn-screenshot').addEventListener('click', async () => {
-    const btn = document.getElementById('btn-screenshot');
-    btn.disabled = true;
-    try {
-      await api.takeScreenshot();
-      // screenshots-updated will fire; also switch to shots tab
-      switchTab('shots');
-    } finally {
-      btn.disabled = false;
-    }
-  });
-
   // ── Record button ────────────────────────────────────────────────────────────
   document.getElementById('btn-record').addEventListener('click', async () => {
     if (state.isRecording) {
@@ -371,9 +358,6 @@ function bindEvents() {
     setRecordingUI(!!active);
   });
 
-  api.onScreenshotError(msg => {
-    showToast(msg, true);
-  });
 
   // IPC: navigate (from main process)
   api.onNavigate(page => showPage(page));
