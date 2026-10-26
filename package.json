@@ -1,6 +1,6 @@
 {
   "name": "vault",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "QA productivity tool \u2014 clipboard, screenshots, recordings",
   "main": "src/main.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "dev": "ELECTRON_IS_DEV=1 electron .",
     "build:mac": "electron-builder --mac dmg",
     "build:mac:dir": "electron-builder --mac dir",
-    "prebuild:mac": "npm version patch --no-git-tag-version"
+    "prebuild:mac": "npm version patch --no-git-tag-version",
+    "ship": "tccutil reset ScreenCapture com.vault.app; rm -rf /Applications/Vault.app; npm run build:mac && open dist/"
   },
   "author": "Tina Heigl",
   "license": "MIT",
