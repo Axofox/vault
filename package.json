@@ -1,0 +1,15 @@
+{
+  "name": "vault",
+  "version": "0.1.0",
+  "description": "QA productivity tool — clipboard, screenshots, recordings",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "ELECTRON_IS_DEV=1 electron ."
+  },
+  "author": "Tina Heigl",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^32.2.0"
+  }
+}

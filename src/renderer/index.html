@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── MAIN PANEL ── -->
+<div id="app-main" class="panel">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M2 2h5v1.5H3.5V8H2V2zm11 0h5v6h-1.5V3.5H13V2zM2 12h1.5v4.5H8V18H2v-6zm14 4.5H12V18h6v-6h-1.5v4.5z" fill="var(--ac)"/>
+        <circle cx="10" cy="10" r="2.5" stroke="var(--ac)" stroke-width="1.5" fill="none"/>
+      </svg>
+    </div>
+    <span class="app-name">Vault</span>
+    <div class="hdr-right">
+      <button class="icon-btn" id="btn-search" title="Search" aria-label="Search">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M2.93 2.93l1.06 1.06M11.01 11.01l1.06 1.06M2.93 12.07l1.06-1.06M11.01 3.99l1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Search bar (collapsible) -->
+  <div class="search-bar" id="search-bar" hidden>
+    <svg width="13" height="13" viewBox="0 0 15 15" fill="none" class="search-icon">
+      <circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <input type="text" id="search-input" placeholder="Search…" autocomplete="off" spellcheck="false">
+    <button class="icon-btn small" id="btn-search-close" aria-label="Close search">
+      <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-tab="clip" role="tab" aria-selected="true">
+      Clipboard <span class="badge" id="badge-clip">0</span>
+    </button>
+    <button class="tab" data-tab="shots" role="tab" aria-selected="false">
+      Screenshots <span class="badge" id="badge-shots">0</span>
+    </button>
+    <button class="tab" data-tab="recs" role="tab" aria-selected="false">
+      Recordings <span class="badge" id="badge-recs">0</span>
+    </button>
+  </div>
+
+  <!-- Clip list -->
+  <div id="pane-clip" class="pane active" role="tabpanel">
+    <div class="item-list" id="clip-list">
+      <div class="empty-state">
+        <p>Nothing copied yet.</p>
+        <p class="sub">Copy anything and it'll appear here.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screenshots pane -->
+  <div id="pane-shots" class="pane" role="tabpanel" hidden>
+    <div class="shot-grid" id="shot-grid">
+      <div class="empty-state">
+        <p>No screenshots yet.</p>
+        <p class="sub">Coming soon — save screenshots via the record strip.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recordings pane -->
+  <div id="pane-recs" class="pane" role="tabpanel" hidden>
+    <div class="item-list" id="rec-list">
+      <div class="empty-state">
+        <p>No recordings yet.</p>
+        <p class="sub">Use the record button below to capture an area.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record strip -->
+  <div class="record-strip">
+    <div class="rec-indicator">
+      <div class="dot" id="rec-dot"></div>
+      <span id="rec-label">Ready</span>
+    </div>
+    <button class="rec-btn" id="btn-record">
+      <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="currentColor"/></svg>
+      Record area
+    </button>
+  </div>
+</div>
+
+<!-- ── SETTINGS PANEL ── -->
+<div id="app-settings" class="panel" hidden>
+
+  <div class="header">
+    <button class="icon-btn" id="btn-back" aria-label="Back">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <span class="app-name">Settings</span>
+  </div>
+
+  <div class="settings-body">
+
+    <div class="sec-lbl">Appearance</div>
+    <div class="row">
+      <div class="row-label">
+        <div class="row-title">Accent color</div>
+        <div class="row-sub">Used for highlights and active states</div>
+      </div>
+    </div>
+    <div class="swatches" id="swatches">
+      <button class="swatch" data-color="#00FF87" style="background:#00FF87" aria-label="Neon green"></button>
+      <button class="swatch" data-color="#00D9FF" style="background:#00D9FF" aria-label="Cyan"></button>
+      <button class="swatch" data-color="#FF6BD6" style="background:#FF6BD6" aria-label="Pink"></button>
+      <button class="swatch" data-color="#FFE500" style="background:#FFE500" aria-label="Yellow"></button>
+      <button class="swatch" data-color="#FF6B35" style="background:#FF6B35" aria-label="Orange"></button>
+      <button class="swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Purple"></button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sec-lbl">Data Retention</div>
+    <div class="row">
+      <div class="row-label">
+        <div class="row-title">Keep data for</div>
+        <div class="row-sub">Older items are deleted automatically</div>
+      </div>
+    </div>
+    <div style="padding: 2px 16px 10px">
+      <div class="seg" role="group" id="retention-seg">
+        <button class="seg-opt" data-val="1d">1d</button>
+        <button class="seg-opt" data-val="7d">7d</button>
+        <button class="seg-opt" data-val="30d">30d</button>
+        <button class="seg-opt" data-val="90d">90d</button>
+        <button class="seg-opt" data-val="inf">Forever</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sec-lbl">Privacy</div>
+    <div class="row">
+      <div class="row-label">
+        <div class="row-title">Auto-detect sensitive data</div>
+        <div class="row-sub">Masks passwords, tokens and API keys</div>
+      </div>
+      <button class="toggle" id="toggle-sens1" aria-label="Toggle sensitive data detection"></button>
+    </div>
+    <div class="row">
+      <div class="row-label">
+        <div class="row-title">Blur vault in screenshots</div>
+        <div class="row-sub">In screenshots and screen recordings</div>
+      </div>
+      <button class="toggle" id="toggle-sens2" aria-label="Toggle blur"></button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sec-lbl">Recording</div>
+    <div class="row">
+      <div class="row-label"><div class="row-title">Quality</div></div>
+      <div class="chip-row" id="quality-chips">
+        <button class="chip" data-val="high">High</button>
+        <button class="chip" data-val="med">Medium</button>
+        <button class="chip" data-val="low">Low</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-title">Format</div></div>
+      <div class="chip-row" id="format-chips">
+        <button class="chip" data-val="mp4">MP4</button>
+        <button class="chip" data-val="gif">GIF</button>
+        <button class="chip" data-val="webm">WebM</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span class="ver">Vault v0.1.0</span>
+    <button class="reset-link" id="btn-reset">Reset to defaults</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
