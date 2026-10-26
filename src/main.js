@@ -1,12 +1,13 @@
 const {
   app, BrowserWindow, Tray, nativeImage,
-  ipcMain, clipboard, screen, desktopCapturer
+  ipcMain, clipboard, screen, desktopCapturer, dialog
 } = require('electron');
 const path = require('path');
 const os   = require('os');
 const { execSync } = require('child_process');
 const fs   = require('fs');
 const zlib = require('zlib');
+const { createClipboardImageCapture } = require('./clipboard-image');
 
 // ── Data directory ─────────────────────────────────────────────────────────
 const DATA_DIR  = path.join(app.getPath('userData'), 'vault-data');
@@ -75,9 +76,14 @@ function safeClips() {
   return clips.map(c => ({ id: c.id, ts: c.ts, display: c.display, sensitive: c.sensitive, kind: c.kind }));
 }
 
+const clipboardImage = createClipboardImageCapture({
+  clipboard, dir: SHOTS_DIR, onSaved: processNewScreenshot,
+});
+
 function startClipboardWatcher() {
   clips = pruneOld(readJSON(CLIPS_FILE, []));
   setInterval(() => {
+    clipboardImage.capture();
     const text = clipboard.readText();
     if (!text || text === lastClip) return;
     lastClip = text;
@@ -215,10 +221,8 @@ async function processNewScreenshot(filepath) {
   const img = nativeImage.createFromPath(filepath);
   if (img.isEmpty()) return;
   const ts   = Date.now();
-  const dest = path.join(SHOTS_DIR, `shot-${ts}.png`);
-  fs.copyFileSync(filepath, dest);
   const thumb = img.resize({ width: 240 });
-  const item  = { id: ts.toString(), ts, file: dest, thumb: thumb.toDataURL() };
+  const item  = { id: ts.toString(), ts, file: filepath, thumb: thumb.toDataURL() };
   screenshots = readJSON(SHOTS_FILE, []);
   screenshots.unshift(item);
   screenshots = pruneOld(screenshots.slice(0, 200));
@@ -226,26 +230,46 @@ async function processNewScreenshot(filepath) {
   win?.webContents.send('screenshots-updated', screenshots);
 }
 
+const watchedDirs = new Set();
+
+function watchDir(dir) {
+  if (!dir || watchedDirs.has(dir)) return;
+  try { if (!fs.existsSync(dir)) return; } catch { return; }
+  watchedDirs.add(dir);
+  const EXTS = ['.png', '.jpg', '.jpeg', '.heic', '.tiff', '.bmp', '.webp'];
+  const TWO_MIN = 2 * 60 * 1000;
+  const seen = new Set();
+
+  // On startup: process anything created in the last 2 minutes
+  try {
+    for (const filename of fs.readdirSync(dir)) {
+      seen.add(filename);
+      if (!EXTS.some(e => filename.toLowerCase().endsWith(e))) continue;
+      try {
+        const filepath = path.join(dir, filename);
+        const stat = fs.statSync(filepath);
+        if (Date.now() - stat.mtimeMs < TWO_MIN) processNewScreenshot(filepath);
+      } catch {}
+    }
+  } catch {}
+
+  // Use fs.watch for instant OS-level notifications (macOS FSEvents)
+  try {
+    fs.watch(dir, (eventType, filename) => {
+      if (!filename || seen.has(filename)) return;
+      seen.add(filename);
+      if (!EXTS.some(e => filename.toLowerCase().endsWith(e))) return;
+      const filepath = path.join(dir, filename);
+      processNewScreenshot(filepath);
+    });
+  } catch {}
+}
+
 function watchScreenshotDir() {
   const dirs = getScreenshotDirs();
-  for (const dir of dirs) {
-    const seen = new Set(fs.readdirSync(dir));
-    setInterval(() => {
-      try {
-        const files = fs.readdirSync(dir);
-        for (const filename of files) {
-          if (seen.has(filename)) continue;
-          seen.add(filename);
-          if (!filename.endsWith('.png') && !filename.endsWith('.jpg') && !filename.endsWith('.jpeg')) continue;
-          const filepath = path.join(dir, filename);
-          try {
-            const stat = fs.statSync(filepath);
-            if (Date.now() - stat.mtimeMs < 30000) processNewScreenshot(filepath);
-          } catch {}
-        }
-      } catch {}
-    }, 1500);
-  }
+  if (prefs.screenshotDir) dirs.push(prefs.screenshotDir);
+  for (const dir of dirs) watchDir(dir);
+
 }
 
 // ── Area selection overlay ─────────────────────────────────────────────────
@@ -264,8 +288,12 @@ function openOverlay(resolve) {
   overlayWin.loadFile(path.join(__dirname, 'overlay.html'));
   overlayWin.on('closed', () => { overlayWin = null; });
 
-  ipcMain.handleOnce('area-selected', (_, bounds) => {
+  ipcMain.removeHandler('area-selected');
+  ipcMain.removeHandler('area-cancel');
+  ipcMain.handleOnce('area-selected', (_, b) => {
     overlayWin?.close();
+    // overlay sends {x,y,w,h} — normalise to {x,y,width,height}
+    const bounds = { x: b.x, y: b.y, width: b.w, height: b.h };
     resolve({ ok: true, bounds });
   });
   ipcMain.handleOnce('area-cancel', () => {
@@ -295,6 +323,8 @@ async function startRecording(bounds) {
   });
   captureWin.loadFile(path.join(__dirname, 'capture.html'));
 
+  ipcMain.removeHandler('get-source-id');
+  ipcMain.removeHandler('save-recording');
   ipcMain.handleOnce('get-source-id', () => sourceId);
   ipcMain.handleOnce('save-recording', (_, bytes, ext) => {
     const ts   = Date.now();
@@ -356,7 +386,7 @@ function registerIPC() {
 
   ipcMain.handle('start-area-select', () => {
     win?.hide();
-    return new Promise(resolve => openOverlay(resolve));
+    return new Promise(resolve => openOverlay(r => resolve(r.ok ? r.bounds : null)));
   });
   ipcMain.handle('start-recording', async (_, bounds) => {
     const result = await startRecording(bounds);
@@ -381,11 +411,24 @@ function registerIPC() {
     try {
       const img = nativeImage.createFromPath(filePath);
       if (img.isEmpty()) return false;
+      clipboardImage.markSeen(img);
       clipboard.writeImage(img);
       return true;
     } catch { return false; }
   });
-  ipcMain.handle('check-screen-permission', () => {
+  ipcMain.handle('choose-screenshot-dir', async () => {
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Choose screenshot folder to watch',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    const dir = result.filePaths[0];
+    prefs = { ...prefs, screenshotDir: dir };
+    savePrefs();
+    watchDir(dir);  // start watching immediately, no restart needed
+    return dir;
+  });
+    ipcMain.handle('check-screen-permission', () => {
     if (process.platform !== 'darwin') return 'granted';
     const { systemPreferences } = require('electron');
     return systemPreferences.getMediaAccessStatus('screen');

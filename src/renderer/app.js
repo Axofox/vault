@@ -177,6 +177,8 @@ function renderSettings() {
   document.querySelectorAll('#format-chips .chip').forEach(el => {
     el.classList.toggle('on', el.dataset.val === p.format);
   });
+  const label = document.getElementById('screenshot-dir-label');
+  if (label) label.textContent = p.screenshotDir ? shortenPath(p.screenshotDir) : 'Desktop & Pictures/Screenshots';
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -200,6 +202,11 @@ function showPage(page) {
 }
 
 // ── Recording UI state ────────────────────────────────────────────────────────
+function shortenPath(p) {
+  const home = (typeof process !== 'undefined' && process.env.HOME) || '';
+  return p.startsWith(home) ? '~' + p.slice(home.length) : p;
+}
+
 function setRecordingUI(active) {
   const btn = document.getElementById('btn-record');
   const dot = document.getElementById('rec-dot');
@@ -342,6 +349,14 @@ function bindEvents() {
       quality: 'high', format: 'mp4',
     });
     renderSettings();
+  });
+
+  document.getElementById('btn-choose-screenshot-dir').addEventListener('click', async () => {
+    const dir = await api.chooseScreenshotDir();
+    if (!dir) return;
+    state.prefs = { ...state.prefs, screenshotDir: dir };
+    renderSettings();
+    showToast('Now watching: ' + shortenPath(dir));
   });
 
   // ── IPC live updates ────────────────────────────────────────────────────────
