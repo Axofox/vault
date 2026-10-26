@@ -138,7 +138,31 @@ function createTrayIcon() {
 }
 
 // ── Windows ────────────────────────────────────────────────────────────────
-let tray = null, win = null, overlayWin = null, captureWin = null;
+let tray = null, win = null, overlayWin = null, captureWin = null, frameWin = null;
+
+function openRecordingFrame(bounds) {
+  if (frameWin) { try { frameWin.close(); } catch {} frameWin = null; }
+  const STOP_H = 40, PAD = 3;
+  frameWin = new BrowserWindow({
+    x: Math.round(bounds.x) - PAD,
+    y: Math.round(bounds.y) - STOP_H - PAD,
+    width: Math.round(bounds.width) + PAD * 2,
+    height: Math.round(bounds.height) + STOP_H + PAD * 2,
+    frame: false, transparent: true, resizable: false,
+    alwaysOnTop: true, skipTaskbar: true, focusable: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'frame-preload.js'),
+      contextIsolation: true,
+    },
+  });
+  frameWin.loadFile(path.join(__dirname, 'recording-frame.html'));
+  frameWin.on('closed', () => { frameWin = null; });
+}
+
+function closeRecordingFrame() {
+  try { frameWin?.close(); } catch {}
+  frameWin = null;
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -171,30 +195,30 @@ function toggleWindow() {
 // ── Screenshots ────────────────────────────────────────────────────────────
 let screenshots = [];
 
-function getMacScreenshotDir() {
-  if (process.platform !== 'darwin') return path.join(os.homedir(), 'Desktop');
-  try {
-    const loc = execSync('defaults read com.apple.screencapture location 2>/dev/null', { encoding: 'utf8' }).trim();
-    if (loc) return loc.startsWith('~') ? path.join(os.homedir(), loc.slice(2)) : loc;
-  } catch {}
-  return path.join(os.homedir(), 'Desktop');
+function getScreenshotDirs() {
+  const dirs = new Set([
+    path.join(os.homedir(), 'Desktop'),
+    path.join(os.homedir(), 'Pictures', 'Screenshots'),
+  ]);
+  if (process.platform === 'darwin') {
+    try {
+      const loc = execSync('defaults read com.apple.screencapture location 2>/dev/null', { encoding: 'utf8' }).trim();
+      if (loc) dirs.add(loc.startsWith('~') ? path.join(os.homedir(), loc.slice(2)) : loc);
+    } catch {}
+  }
+  return [...dirs].filter(d => { try { return fs.existsSync(d); } catch { return false; } });
 }
 
 async function processNewScreenshot(filepath) {
-  // Wait briefly to ensure file is fully written by the OS
   await new Promise(r => setTimeout(r, 800));
   if (!fs.existsSync(filepath)) return;
-
   const img = nativeImage.createFromPath(filepath);
   if (img.isEmpty()) return;
-
   const ts   = Date.now();
   const dest = path.join(SHOTS_DIR, `shot-${ts}.png`);
   fs.copyFileSync(filepath, dest);
-
   const thumb = img.resize({ width: 240 });
   const item  = { id: ts.toString(), ts, file: dest, thumb: thumb.toDataURL() };
-
   screenshots = readJSON(SHOTS_FILE, []);
   screenshots.unshift(item);
   screenshots = pruneOld(screenshots.slice(0, 200));
@@ -203,30 +227,25 @@ async function processNewScreenshot(filepath) {
 }
 
 function watchScreenshotDir() {
-  const dir = getMacScreenshotDir();
-  if (!fs.existsSync(dir)) return;
-
-  // Poll every 1.5s — more reliable than fs.watch on macOS
-  const seen = new Set(fs.readdirSync(dir));
-  setInterval(() => {
-    try {
-      const files = fs.readdirSync(dir);
-      for (const filename of files) {
-        if (seen.has(filename)) continue;
-        seen.add(filename);
-        // Accept any new PNG (covers custom shortcut apps too)
-        if (!filename.endsWith('.png') && !filename.endsWith('.jpg')) continue;
-        // Only process files created in the last 30s (ignore pre-existing files on first scan)
-        const filepath = path.join(dir, filename);
-        try {
-          const stat = fs.statSync(filepath);
-          if (Date.now() - stat.mtimeMs < 30000) {
-            processNewScreenshot(filepath);
-          }
-        } catch {}
-      }
-    } catch {}
-  }, 1500);
+  const dirs = getScreenshotDirs();
+  for (const dir of dirs) {
+    const seen = new Set(fs.readdirSync(dir));
+    setInterval(() => {
+      try {
+        const files = fs.readdirSync(dir);
+        for (const filename of files) {
+          if (seen.has(filename)) continue;
+          seen.add(filename);
+          if (!filename.endsWith('.png') && !filename.endsWith('.jpg') && !filename.endsWith('.jpeg')) continue;
+          const filepath = path.join(dir, filename);
+          try {
+            const stat = fs.statSync(filepath);
+            if (Date.now() - stat.mtimeMs < 30000) processNewScreenshot(filepath);
+          } catch {}
+        }
+      } catch {}
+    }, 1500);
+  }
 }
 
 // ── Area selection overlay ─────────────────────────────────────────────────
@@ -285,10 +304,14 @@ async function startRecording(bounds) {
     win?.webContents.send('recordings-updated', recordings.map(safeRec));
     captureWin?.close(); captureWin = null;
     recordingActive = false;
+    closeRecordingFrame();
     win?.webContents.send('recording-state', false);
+    // Show vault panel on recordings tab after recording finishes
+    if (win) { positionWindow(); win.show(); win.focus(); }
   });
   recordingActive = true;
   win?.webContents.send('recording-state', true);
+  openRecordingFrame(bounds);
   return true;
 }
 
@@ -333,19 +356,32 @@ function registerIPC() {
   });
   ipcMain.handle('start-recording', async (_, bounds) => {
     const result = await startRecording(bounds);
-    // Show the panel again so the Stop button is accessible during recording
-    win?.show(); win?.focus();
     return result;
   });
   ipcMain.handle('stop-recording', () => stopRecording());
+  ipcMain.on('stop-from-frame', () => stopRecording());
   ipcMain.handle('close-window', () => win?.hide());
+  ipcMain.handle('copy-screenshot', (_, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) return false;
+    try {
+      const img = nativeImage.createFromPath(filePath);
+      if (img.isEmpty()) return false;
+      clipboard.writeImage(img);
+      return true;
+    } catch { return false; }
+  });
+  ipcMain.handle('check-screen-permission', () => {
+    if (process.platform !== 'darwin') return 'granted';
+    const { systemPreferences } = require('electron');
+    return systemPreferences.getMediaAccessStatus('screen');
+  });
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  watchScreenshotDir();
   ensureDataDir();
   loadPrefs();
+  watchScreenshotDir();
 
   // Show in both dock and menu bar
   // Dock click opens/focuses the panel

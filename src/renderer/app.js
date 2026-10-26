@@ -113,7 +113,7 @@ function renderScreenshots() {
   document.getElementById('badge-shots').textContent = items.length;
 
   if (!items.length) {
-    grid.innerHTML = `<div class="empty-state"><p>No screenshots yet.</p><p class="sub">Use the camera button below to capture a screenshot.</p></div>`;
+    grid.innerHTML = `<div class="empty-state"><p>No screenshots yet.</p><p class="sub">Take a screenshot with your Mac shortcuts — it'll appear here automatically.</p></div>`;
     return;
   }
 
@@ -262,6 +262,14 @@ function bindEvents() {
     flashRow(row, '✓ Copied');
   });
 
+  // ── Screenshot grid: click to copy to clipboard ──────────────────────────────
+  document.getElementById('shot-grid').addEventListener('click', async e => {
+    const item = e.target.closest('.shot-item');
+    if (!item || !item.dataset.path) return;
+    const ok = await api.copyScreenshot(item.dataset.path);
+    showToast(ok ? 'Screenshot copied to clipboard' : 'Could not copy screenshot', !ok);
+  });
+
   // ── Record button ────────────────────────────────────────────────────────────
   document.getElementById('btn-record').addEventListener('click', async () => {
     if (state.isRecording) {
@@ -273,6 +281,12 @@ function bindEvents() {
       const btn = document.getElementById('btn-record');
       btn.disabled = true;
       try {
+        const perm = await api.checkScreenPermission();
+        if (perm !== 'granted') {
+          showToast('Screen Recording permission needed.\nGo to System Settings → Privacy → Screen Recording and enable Vault.', true);
+          btn.disabled = false;
+          return;
+        }
         const bounds = await api.startAreaSelect();
         if (bounds) {
           await api.startRecording(bounds);

@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('vault', {
 
   // Screenshots
   getScreenshots:      ()      => ipcRenderer.invoke('get-screenshots'),
+  copyScreenshot: (filePath) => ipcRenderer.invoke('copy-screenshot', filePath),
+  checkScreenPermission: () => ipcRenderer.invoke('check-screen-permission'),
   onScreenshotsUpdated: (fn)  => {
     const handler = (_, data) => fn(data);
     ipcRenderer.on('screenshots-updated', handler);
