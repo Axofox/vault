@@ -279,7 +279,7 @@ let recordings = [], recordingActive = false;
 
 async function startRecording(bounds) {
   const sources = await desktopCapturer.getSources({ types: ['screen'] });
-  if (!sources.length) return false;
+  if (!sources.length) return { noPermission: true };
   const sourceId = sources[0].id;
 
   captureWin = new BrowserWindow({

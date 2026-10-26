@@ -281,16 +281,14 @@ function bindEvents() {
       const btn = document.getElementById('btn-record');
       btn.disabled = true;
       try {
-        const perm = await api.checkScreenPermission();
-        if (perm !== 'granted') {
-          showToast('Screen Recording permission needed.\nGo to System Settings → Privacy → Screen Recording and enable Vault.', true);
-          btn.disabled = false;
-          return;
-        }
         const bounds = await api.startAreaSelect();
         if (bounds) {
-          await api.startRecording(bounds);
-          setRecordingUI(true);
+          const result = await api.startRecording(bounds);
+          if (result && result.noPermission) {
+            showToast('Screen Recording is off.\nSystem Settings → Privacy → Screen Recording → enable Vault.', true);
+          } else if (result) {
+            setRecordingUI(true);
+          }
         }
       } catch (err) {
         console.error('Area select/record error:', err);
