@@ -129,6 +129,10 @@ function renderScreenshots() {
 }
 
 // ── Render recordings ─────────────────────────────────────────────────────────
+function fileUrl(p) {
+  return 'file://' + encodeURI(p).replace(/#/g, '%23').replace(/\?/g, '%3F');
+}
+
 function renderRecordings() {
   const list = document.getElementById('rec-list');
   const items = state.recordings;
@@ -143,13 +147,7 @@ function renderRecordings() {
     const dur = r.duration ? fmtDuration(r.duration) : '';
     const name = (r.path || '').split('/').pop() || 'recording';
     return `<div class="rec-item" data-path="${esc(r.path || '')}">
-      <div class="rec-item-icon">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-          <rect x="1" y="3" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
-          <circle cx="14.5" cy="7" r="2.5" fill="#FF4444" opacity="0.85"/>
-          <path d="M5 9l3-2v4L5 9z" fill="currentColor"/>
-        </svg>
-      </div>
+      <video class="rec-thumb" src="${esc(fileUrl(r.path || ''))}#t=0.1" muted loop playsinline preload="metadata"></video>
       <div class="rec-item-body">
         <div class="rec-item-name">${esc(name)}</div>
         <div class="rec-item-meta">${fmt(r.ts)}${dur ? ' · ' + dur : ''}</div>
@@ -357,6 +355,19 @@ function bindEvents() {
     state.prefs = { ...state.prefs, screenshotDir: dir };
     renderSettings();
     showToast('Now watching: ' + shortenPath(dir));
+  });
+
+  // Recording previews play on hover and rewind to the first frame on leave
+  const recList = document.getElementById('rec-list');
+  recList.addEventListener('mouseover', e => {
+    const item = e.target.closest('.rec-item');
+    if (item && !item.contains(e.relatedTarget)) item.querySelector('.rec-thumb')?.play().catch(() => {});
+  });
+  recList.addEventListener('mouseout', e => {
+    const item = e.target.closest('.rec-item');
+    if (!item || item.contains(e.relatedTarget)) return;
+    const v = item.querySelector('.rec-thumb');
+    if (v) { v.pause(); v.currentTime = 0.1; }
   });
 
   // ── IPC live updates ────────────────────────────────────────────────────────
