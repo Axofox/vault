@@ -6,27 +6,49 @@
 <script>
 let recorder, chunks = [];
 
+function pickMimeType() {
+  const types = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
 async function start() {
-  const sourceId = await window.capture.getSourceId();
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      mandatory: {
-        chromeMediaSource: 'desktop',
-        chromeMediaSourceId: sourceId,
+  try {
+    const sourceId = await window.capture.getSourceId();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sourceId,
+          minWidth: 1, maxWidth: 4096,
+          minHeight: 1, maxHeight: 4096,
+        }
       }
-    }
-  });
-  document.getElementById('v').srcObject = stream;
-  recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  recorder.onstop = async () => {
-    const blob = new Blob(chunks, { type: 'video/webm' });
-    const buf = await blob.arrayBuffer();
-    await window.capture.saveRecording(Array.from(new Uint8Array(buf)), 'webm');
-    chunks = [];
-  };
-  recorder.start(200);
+    });
+    document.getElementById('v').srcObject = stream;
+    const mimeType = pickMimeType();
+    const opts = mimeType ? { mimeType } : {};
+    recorder = new MediaRecorder(stream, opts);
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      const ext = 'webm';
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const buf = await blob.arrayBuffer();
+      await window.capture.saveRecording(Array.from(new Uint8Array(buf)), ext);
+      chunks = [];
+    };
+    recorder.start(200);
+    window.capture.reportReady();
+  } catch (err) {
+    window.capture.reportError(String(err));
+  }
 }
 
 window.capture.onStop(() => {

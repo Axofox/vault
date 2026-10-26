@@ -366,6 +366,11 @@ function bindEvents() {
     if (state.tab !== 'recs') switchTab('recs');
   });
 
+  api.onRecordingError(msg => {
+    setRecordingUI(false);
+    showToast('Recording failed: ' + msg, true);
+  });
+
   api.onRecordingState(active => {
     setRecordingUI(!!active);
   });

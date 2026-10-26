@@ -282,8 +282,12 @@ async function startRecording(bounds) {
   if (!sources.length) return { noPermission: true };
   const sourceId = sources[0].id;
 
+  const d = screen.getPrimaryDisplay();
   captureWin = new BrowserWindow({
-    width: 1, height: 1, show: false,
+    x: d.bounds.x + d.bounds.width + 100,
+    y: d.bounds.y,
+    width: 1, height: 1,
+    show: true, frame: false, skipTaskbar: true,
     webPreferences: {
       preload: path.join(__dirname, 'capture-preload.js'),
       contextIsolation: true,
@@ -361,6 +365,17 @@ function registerIPC() {
   ipcMain.handle('stop-recording', () => stopRecording());
   ipcMain.on('stop-from-frame', () => stopRecording());
   ipcMain.handle('close-window', () => win?.hide());
+  ipcMain.on('capture-ready', () => {
+    // capture started successfully — nothing to do
+  });
+  ipcMain.on('capture-error', (_, msg) => {
+    recordingActive = false;
+    closeRecordingFrame();
+    captureWin?.close(); captureWin = null;
+    win?.webContents.send('recording-state', false);
+    win?.webContents.send('recording-error', msg);
+    positionWindow(); win?.show(); win?.focus();
+  });
   ipcMain.handle('copy-screenshot', (_, filePath) => {
     if (!filePath || !fs.existsSync(filePath)) return false;
     try {

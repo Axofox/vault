@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld('vault', {
     ipcRenderer.on('recordings-updated', handler);
     return () => ipcRenderer.removeListener('recordings-updated', handler);
   },
+  onRecordingError: (fn) => {
+    const handler = (_, msg) => fn(msg);
+    ipcRenderer.on('recording-error', handler);
+    return () => ipcRenderer.removeListener('recording-error', handler);
+  },
   onRecordingState: (fn) => {
     const handler = (_, state) => fn(state);
     ipcRenderer.on('recording-state', handler);
