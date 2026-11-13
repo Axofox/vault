@@ -122,12 +122,14 @@ function createTrayIcon() {
   for (let y = 0; y < H; y++) {
     raw[y * (W * 4 + 1)] = 0;
     for (let x = 0; x < W; x++) {
-      const tl = (x < 4 && y < 2) || (x < 2 && y >= 2 && y < 5);
-      const tr = (x >= 12 && y < 2) || (x >= 14 && y >= 2 && y < 5);
-      const bl = (x < 4 && y >= 14) || (x < 2 && y >= 11 && y < 14);
-      const br = (x >= 12 && y >= 14) || (x >= 14 && y >= 11 && y < 14);
-      const dot = x >= 7 && x <= 8 && y >= 7 && y <= 8;
-      const on = tl || tr || bl || br || dot;
+      // Keyhole logo: rounded square outline, keyhole head, keyhole stem
+      const inBox  = x >= 1 && x <= 14 && y >= 1 && y <= 14;
+      const corner = (x === 1 || x === 14) && (y === 1 || y === 14);
+      const inner  = x >= 3 && x <= 12 && y >= 3 && y <= 12;
+      const frame  = inBox && !corner && !inner;
+      const head   = (x >= 6 && x <= 9 && y >= 6 && y <= 7) || (x >= 7 && x <= 8 && y >= 5 && y <= 8);
+      const stem   = x >= 7 && x <= 8 && y >= 9 && y <= 11;
+      const on = frame || head || stem;
       const off = y * (W * 4 + 1) + 1 + x * 4;
       raw[off] = 0; raw[off+1] = 0; raw[off+2] = 0; raw[off+3] = on ? 255 : 0;
     }
